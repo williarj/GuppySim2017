@@ -18,5 +18,5 @@ python cleanup.py ../output/no_c_*.txt > ../data/no_c_avg.txt
 python cleanup.py ../output/no_p_r_*.txt > ../data/no_p_r_avg.txt
 python cleanup.py ../output/no_p_c_*.txt > ../data/no_p_c_avg.txt
 
-#this one has to be last otherwise it will pool the other no_p runs
-python cleanup.py ../output/no_p_*.txt > ../data/no_p_avg.txt
+#this one is wierd so it will not pool the other no_p runs
+python cleanup.py ../output/no_p_[0-9].txt ../output/no_p_[0-9][0-9].txt > ../data/no_p_avg.txt
