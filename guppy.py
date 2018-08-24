@@ -18,6 +18,7 @@ def main():
     for i in range(args.T):
         #each male decides
         random.shuffle(males)
+        #sys.stderr.write("TIME %s*************************" % i)
         for m in males:
             m.pickFemale(females)
             #output the timestep data, after each male
@@ -114,7 +115,7 @@ def printAll(l):
 def makeMales():
     males = []
     id = 0
-    for i in range(0, args.N, 3):
+    for i in range(0, int(args.N*args.mf_ratio), 3):
         brothers = [Male(id+i) for i in range(3)]
         brothers[0].addBrother(brothers[1])
         brothers[0].addBrother(brothers[2])
@@ -155,18 +156,24 @@ def value(female, context, P=True, C=True, R=True, Cone=False):
         V *= 1
     elif context == 1:
         V *= 0
+        return V
     else:
         effective_c = args.c
         effective_context = context
         
         if C == False:
             effective_c = 0
-        if Cone == True:
-            effective_c = 1
+    #    if Cone == True:
+    #        effective_c = 1
         if R == False:
             effective_context = 0
+            
 
-        V += (1 - effective_c * (1 + effective_context))
+        V *= (1 - effective_c * (1 + effective_context))
+        V = max(0, V)
+    if Cone == True: sys.stderr.write("P (%s) context (%s) V (%s)\n" % (female.profit, context, V))
+    if V < 0:
+        sys.stderr.write("Neg V (%s) P (%s, %s) context (%s) C (%s)\n" % (V, female.profit, P, effective_c, effective_context)) 
     return V
 
 #expected effort of male towarfs a given female
@@ -200,7 +207,7 @@ def currentEffort(focal_female, females, male, assessing = False):
         P = args.p
         R = args.r
         C = args.no_c
-        Cone = args.one_c
+        Cone = False
 
     
         return effort_landscape(focal_female, females, focal_female.getContext(male), male, P, R, C, Cone)
@@ -211,13 +218,13 @@ def currentEffort(focal_female, females, male, assessing = False):
 #uses the current landscape of females
 #E' = W*P/sum(W*P, females)
 def effort_landscape(focal_female, females, context, male, P=True, R=True, C=True, Cone=False):
-    V = value(focal_female, context, P, C, R, Cone)
+    V = value(focal_female, context, P=P, C=C, R=R, Cone=Cone)
     denominator = V
 
     for f in females:
         if f == focal_female:
             continue
-        denominator += value(f, f.getContext(male), P, C, R, Cone)
+        denominator += value(f, f.getContext(male), P=P, C=C, R=R, Cone=Cone)
     
     return float(V)/denominator
 
@@ -307,7 +314,7 @@ class Female:
         nonkin = 0
         for f in self.Followers:
             if f == male:
-                continue#ignore myself
+                  continue#ignore myself
             if male.isBrother(f):
                 brothers += 1
             else:
@@ -341,6 +348,9 @@ class Male:
         #because they are picked in series and the context of 
         #each female changes as the males chose who to pursue
         self.setFemaleWeights(females)
+        #sys.stderr.write("%s \n%s\n" % (self.ID, [x.ID for x in self.brothers]))
+        #sys.stderr.write("fems %s\n" % self.female_weights)
+        
         if sum(self.female_weights) == 0: 
             sys.stderr.write("%s ... %s\n" % (females, self.female_weights))
             self.setFemaleWeights(females, 1)
@@ -381,7 +391,7 @@ class Male:
 def parseArgs():
     parser = argparse.ArgumentParser(description="Runs simulation of a guppy mating trial")
     parser.add_argument("--no_r", dest="r", action="store_false", default=True, help="if this flag is used relatedness is set to '0' for all competitive contexts when males assess female value.")
-    parser.add_argument("--one_c", dest="one_c", action="store_true", default=False, help="if this flag is used then C is set to 1 when males assess female value.")
+    #parser.add_argument("--one_c", dest="one_c", action="store_true", default=False, help="if this flag is used then C is set to 1 when males assess female value.")
     parser.add_argument("--no_c", dest="no_c", action="store_false", default=True, help="if this flagis used then the 'C' parameter is set to 0 when males assess female value.")
     parser.add_argument("-c", type=float, default=0.47, help="The 'C' vaule used to calculate female value.")
     parser.add_argument("--no_p", dest="p", action="store_false", default=True, help="If this flag is used female profitability is set to '1' for all females when males assess female value.")
@@ -392,6 +402,8 @@ def parseArgs():
     parser.add_argument("-s", "--stop_chance", dest="stop", type=float, default=0.10, help="The chance a male will chose to pursue no females in any given time step.")
 
     parser.add_argument("--time_output", default="", type=str, help="The file to output data from each time step, this data will not be output if no filename is provided.")
+
+    parser.add_argument("-m", "--male_female_ratio", dest="mf_ratio", type=float, default=1, help='The ratio of males to females in the trial. If this number times N is not a multiple of 2 then the simulation will crash, or act unexpectedly. This is for testing only.')
 
     args = parser.parse_args()
     if args.N%3 != 0 :
